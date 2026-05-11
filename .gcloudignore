@@ -1,0 +1,10 @@
+__pycache__/, *.pyc          ← Python cache
+.env.yaml, sa-key.json       ← secrets
+run_local.py                 ← local only
+.claude/, claude-ML/         ← your Claude workspace
+main.zip                     ← old archive
+summary.md                   ← internal notes
+gdrive-platform-document*    ← internal doc
+Google Drive Intelligence*/  ← platform doc folder
+drive_snapshot_*.csv         ← local snapshots
+README.md, LICENSE           ← not needed on GCP

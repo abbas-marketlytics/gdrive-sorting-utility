@@ -1,0 +1,102 @@
+# ══════════════════════════════════════════════════════════════
+# Google Drive Sorting Utility — Configuration
+# ══════════════════════════════════════════════════════════════
+# Edit this file to match your Google Drive structure.
+# All Drive folder names must match exactly as they appear in Drive.
+
+# ── Agency ────────────────────────────────────────────────────
+agency:
+  name: "Marketlytics"          # Your agency name — used in AI prompts and emails
+                                 # e.g. "Acme Analytics", "Growth Agency"
+
+# ── Google Drive structure ────────────────────────────────────
+drive:
+  # Folders to scan for stray files.
+  # Each entry is a parent folder, with an optional child subfolder.
+  # The scan finds files sitting directly inside these folders.
+  scan_targets:
+    - parent: "Analytics-ML"
+      child: null                # scans direct children of Analytics-ML
+    - parent: "Analytics-ML"
+      child: "Marketlytics Old clients"   # scans children of this subfolder
+    - parent: "All Projects"
+      child: null
+
+  # Where new client folders are created when status = NEW_FOLDER
+  root_folder: "Analytics-ML"
+
+  # Folders excluded from being used as move destinations.
+  # These are structural/internal folders — not client folders.
+  # Add any folder that should never appear as a suggested destination.
+  excluded_folders:
+    - "null"
+    - "internal Projects"
+    - "BigQuery"
+    - "[Archive files]"
+    - "GA4"
+    - "Google Ads"
+    - "Grain Recordings"
+    - "Hubspot"
+    - "Hussain"
+    - "Marketlytics Old clients"
+
+  # Default destination for files that cannot be matched to any client.
+  # Must exist in Drive and NOT be in excluded_folders.
+  archive_folder: "[Archive files]"
+
+  # Set to true to also scan files shared with the service account
+  # (sharedWithMe). These files can only be moved if the SA owns them;
+  # otherwise a Drive shortcut is created in the destination.
+  scan_shared_with_me: false
+
+# ── Matching configuration ────────────────────────────────────
+matching:
+  # Minimum fuzzy score (0-100) for fuzzy pre-match to accept a result.
+  # Raise to 90+ to reduce false positives. Lower to 80 to catch more.
+  fuzzy_threshold: 85
+
+  # Minimum fuzzy score for validating AI-returned folder names
+  # back against the real folder list. Prevents hallucinated names.
+  validation_threshold: 85
+
+  # Files per Cloud Function invocation (one batch per run).
+  # Lower = shorter runs, more Cloud Scheduler invocations needed.
+  batch_size: 100
+
+  # Files per individual AI API call.
+  ai_batch_size: 50
+
+  # Maximum folders shown to AI per batch (reduces hallucination).
+  max_candidate_folders: 120
+
+  # AI results with this confidence level are discarded.
+  skip_confidence: "low"
+
+  # Maximum unmatched files processed per suggestion pass run.
+  suggestion_batch_size: 500
+
+# ── AI model ──────────────────────────────────────────────────
+ai:
+  # Anthropic model to use. claude-haiku-4-5-20251001 is recommended —
+  # fast, cheap, and accurate for structured JSON matching tasks.
+  model: "claude-haiku-4-5-20251001"
+  max_tokens: 4096
+  temperature: 0.0              # deterministic output — do not change
+
+# ── Rate limiting ─────────────────────────────────────────────
+rate_limiting:
+  # Minimum seconds between consecutive AI API calls.
+  # Increase if you hit 429 rate limit errors.
+  min_gap_seconds: 2.0
+
+  # Seconds to wait between batches within a single run.
+  inter_batch_sleep: 10
+
+# ── Scheduling (informational — set in Cloud Scheduler) ───────
+schedule:
+  # Runs on the 5th of each month, every 45 minutes, 6PM-10PM local time.
+  # Two Cloud Scheduler jobs required (cron can't express every 45 min).
+  # Job A: "0 13-16 5 * *"   (fires at :00 past each hour, UTC)
+  # Job B: "45 13-16 5 * *"  (fires at :45 past each hour, UTC)
+  day_of_month: 5
+  timezone: "UTC"
