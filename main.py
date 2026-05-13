@@ -2074,6 +2074,21 @@ def drive_manager(request):
                              f"{EXISTING_SHEET_ID}/edit")
                 print(f"\nContinuing — tab: '{tab_title}'")
 
+                # If tab is marked complete, nothing left to do
+                if tab_title.endswith("✓"):
+                    print("  ✓ Audit already complete — email was sent in a previous run.")
+                    return (
+                        json.dumps({
+                            "status":  "success",
+                            "mode":    "audit",
+                            "message": "Audit already complete for today.",
+                            "tab":     tab_title,
+                            "sheet":   sheet_url,
+                        }),
+                        200,
+                        {"Content-Type": "application/json"}
+                    )
+
             # ── Decide what this run should do ────────────────────────────────
             if check_all_processed(sheet):
                 all_values      = sheet.get_all_values()
@@ -2086,18 +2101,19 @@ def drive_manager(request):
                 )
 
                 if unmatched_count > 0:
-                    # Process next 500 UNMATCHED only — resumable across runs
+                    # Process next 500 UNMATCHED — resumable across runs
                     print(f"\n  Suggestion pass — {unmatched_count} UNMATCHED remain...")
                     _, sheet  = _get_fresh_sheet(sheet.title)
                     remaining = run_final_suggestion_pass(
                         sheet, folders_df, folder_names, batch_size=500
                     )
                     if remaining > 0:
+                        # More UNMATCHED left — do NOT send email yet
                         msg = (f"Suggestion batch complete. "
                                f"~{remaining} UNMATCHED rows remain for next run.")
                         print(f"\n  {msg}")
                     else:
-                        # All suggestion done — send email
+                        # Suggestion pass fully done — tally and send email
                         _, sheet      = _get_fresh_sheet(sheet.title)
                         all_values    = sheet.get_all_values()
                         status_col    = all_values[0].index("status")
@@ -2116,9 +2132,23 @@ def drive_manager(request):
                               f"UNMATCHED={unmatched_cnt}")
                         send_audit_email(sheet_url, matched_cnt,
                                          unmatched_cnt, total_cnt)
+                        # Mark tab as complete — prevents re-sending email on subsequent runs
+                        try:
+                            sheet.spreadsheet.batch_update({"requests": [{
+                                "updateSheetProperties": {
+                                    "properties": {
+                                        "sheetId": sheet._properties["sheetId"],
+                                        "title":   sheet.title + " ✓",
+                                    },
+                                    "fields": "title",
+                                }
+                            }]})
+                            print(f"  ✓ Tab marked complete: '{sheet.title} ✓'")
+                        except Exception as e:
+                            print(f"  ⚠ Could not rename tab: {e}")
                         msg = "Audit complete. Email sent."
                 else:
-                    # No UNMATCHED — send email directly
+                    # No UNMATCHED rows at all — send email directly
                     _, sheet      = _get_fresh_sheet(sheet.title)
                     all_values    = sheet.get_all_values()
                     status_col    = all_values[0].index("status")
@@ -2131,6 +2161,20 @@ def drive_manager(request):
                     total_cnt     = len(all_values) - 1
                     print(f"\n✅ All done — sending audit email...")
                     send_audit_email(sheet_url, matched_cnt, 0, total_cnt)
+                    # Mark tab as complete — prevents re-sending email on subsequent runs
+                    try:
+                        sheet.spreadsheet.batch_update({"requests": [{
+                            "updateSheetProperties": {
+                                "properties": {
+                                    "sheetId": sheet._properties["sheetId"],
+                                    "title":   sheet.title + " ✓",
+                                },
+                                "fields": "title",
+                            }
+                        }]})
+                        print(f"  ✓ Tab marked complete: '{sheet.title} ✓'")
+                    except Exception as e:
+                        print(f"  ⚠ Could not rename tab: {e}")
                     msg = "Audit complete. Email sent."
 
             else:
